@@ -1,4 +1,4 @@
-module Osakanagram exposing (Model, Msg(..), init, main, subscriptions, update, view)
+module Osakanagram exposing (Model, Msg(..), init, main, update, view)
 
 import Browser
 import Html exposing (..)
@@ -6,26 +6,24 @@ import Html.Attributes exposing (..)
 import Html.Events exposing (..)
 import Http
 import Json.Decode as D
+import Photo
+import Tuple
 
 
 type alias Model =
-    { photos : List Photo }
+    { photos : List Photo.Model }
 
 
 type Msg
-    = GotPhotos (Result Http.Error (List Photo))
-    | AddFav Int
-
-
-type alias Photo =
-    { fav : Int, title : String, image : String }
+    = GotPhotos (Result Http.Error (List Photo.Model))
+    | PhotoMsg Int Photo.Msg
 
 
 jsonToPhotos =
     let
         f =
             D.map2
-                (Photo 0)
+                (Photo.Model 0)
                 (D.field "title" D.string)
                 (D.field "image" D.string)
     in
@@ -46,6 +44,10 @@ init () =
 
 view : Model -> Html Msg
 view { photos } =
+    let
+        f index model =
+            Photo.view model |> Html.map (PhotoMsg index)
+    in
     div []
         [ header
             [ style "position" "fixed"
@@ -70,47 +72,7 @@ view { photos } =
             [ style "width" "500px"
             , style "margin" "65px auto"
             ]
-            (photos |> List.indexedMap photoView)
-        ]
-
-
-photoView : Int -> Photo -> Html Msg
-photoView index { fav, title, image } =
-    div
-        [ style "border" "1px solid silver"
-        , style "margin" "25px 0"
-        ]
-        [ div []
-            [ img
-                [ style "width" "100%"
-                , src <| "http://localhost:8080" ++ image
-                ]
-                []
-            ]
-        , div [ style "padding" "0 5px" ] [ text title ]
-        , div [ style "padding" "0 5px" ]
-            [ button
-                [ style "cursor" "pointer"
-                , style "border" "0"
-                , style "fontSize" "large"
-                , style "backgroundColor" "transparent"
-                , style "color" <|
-                    if fav == 0 then
-                        "gray"
-
-                    else
-                        "PaleVioletRed"
-                , onClick (AddFav index)
-                ]
-                [ text <|
-                    if fav == 0 then
-                        "☆"
-
-                    else
-                        "★"
-                ]
-            , span [] [ text "いいね！", span [] [ text <| String.fromInt fav ], text "件" ]
-            ]
+            (photos |> List.indexedMap f)
         ]
 
 
@@ -123,27 +85,26 @@ update msg model =
         GotPhotos (Err s) ->
             Debug.todo "error"
 
-        AddFav index ->
-            ( { model | photos = addFav index model.photos }, Cmd.none )
+        PhotoMsg index subMsg ->
+            let
+                f i photo =
+                    if i == index then
+                        Photo.update subMsg photo
 
+                    else
+                        ( photo, Cmd.none )
 
-addFav : Int -> List Photo -> List Photo
-addFav index photos =
-    photos
-        |> List.indexedMap
-            (\i p ->
-                if i == index then
-                    { p | fav = p.fav + 1 }
+                photos =
+                    List.indexedMap f model.photos
 
-                else
-                    p
-            )
+                g i =
+                    Cmd.map (PhotoMsg i)
 
-
-subscriptions : Model -> Sub Msg
-subscriptions model =
-    Sub.none
+                cmd =
+                    photos |> List.map Tuple.second |> List.indexedMap g |> Cmd.batch
+            in
+            ( { model | photos = photos |> List.map Tuple.first }, cmd )
 
 
 main =
-    Browser.element { init = init, view = view, update = update, subscriptions = subscriptions }
+    Browser.element { init = init, view = view, update = update, subscriptions = always Sub.none }
