@@ -1,6 +1,7 @@
 module Photo exposing (Model, Msg(..), init, main, update, view)
 
 import Browser
+import Css
 import Html exposing (..)
 import Html.Attributes exposing (..)
 import Html.Events exposing (..)
@@ -29,29 +30,20 @@ init () =
 view : Model -> Html Msg
 view { fav, title, image } =
     div
-        [ style "border" "1px solid silver"
-        , style "margin" "25px 0"
-        ]
+        [ class "photo" ]
         [ div []
-            [ img
-                [ style "width" "100%"
-                , src <| "http://localhost:8080" ++ image
-                ]
-                []
+            [ img [ src <| "http://localhost:8080" ++ image ] []
             ]
-        , div [ style "padding" "0 5px" ] [ text title ]
-        , div [ style "padding" "0 5px" ]
+        , div [ class "parts" ] [ text title ]
+        , div [ class "parts" ]
             [ button
-                [ style "cursor" "pointer"
-                , style "border" "0"
-                , style "fontSize" "large"
-                , style "backgroundColor" "transparent"
-                , style "color" <|
+                [ class "fav-button"
+                , class <|
                     if fav == 0 then
-                        "gray"
+                        ""
 
                     else
-                        "PaleVioletRed"
+                        "fav"
                 , onClick AddFav
                 ]
                 [ text <|
@@ -74,4 +66,8 @@ update msg model =
 
 
 main =
-    Browser.element { init = init, view = view, update = update, subscriptions = always Sub.none }
+    let
+        v =
+            view >> (\a -> div [] [ a, Css.css ])
+    in
+    Browser.element { init = init, view = v, update = update, subscriptions = always Sub.none }
